@@ -54,7 +54,7 @@ void ChassisInit()
         .controller_param_init_config = {
             .speed_PID = 
             {
-                .Kp = 6, // 4.5
+                .Kp = 10, // 4.5
                 .Ki = 0,  // 0
                 .Kd = 0,  // 0
                 .IntegralLimit = 3000,
@@ -82,20 +82,20 @@ void ChassisInit()
     };
 
     chassis_motor_config.can_init_config.tx_id = 0x201;
-    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
-    motor_lf = DJIMotorInit(&chassis_motor_config);
+    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
+    motor_rf = DJIMotorInit(&chassis_motor_config);
 
     chassis_motor_config.can_init_config.tx_id = 0x202;
     chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
-    motor_lb = DJIMotorInit(&chassis_motor_config);
+    motor_lf = DJIMotorInit(&chassis_motor_config);
 
     chassis_motor_config.can_init_config.tx_id = 0x203;
-    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
-    motor_rb = DJIMotorInit(&chassis_motor_config);
+    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
+    motor_lb = DJIMotorInit(&chassis_motor_config);
 
     chassis_motor_config.can_init_config.tx_id = 0x204;
     chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
-    motor_rf = DJIMotorInit(&chassis_motor_config);
+    motor_rb = DJIMotorInit(&chassis_motor_config);
 
 
 
@@ -156,7 +156,7 @@ static void ChassisRotateSet()
             chassis_cmd_recv.wz =0;
         break;
         case CHASSIS_ROTATE: // 变速小陀螺
-            chassis_cmd_recv.wz =0;
+            chassis_cmd_recv.wz =2000;
         break;
         default:
         break;
@@ -168,9 +168,9 @@ static void ChassisRotateSet()
  */
 static void MecanumCalculate()
 {
-    cos_theta = arm_cos_f32(chassis_cmd_recv.offset_angle * DEGREE_2_RAD);
-    sin_theta = arm_sin_f32(chassis_cmd_recv.offset_angle * DEGREE_2_RAD);
-
+    cos_theta = arm_cos_f32((chassis_cmd_recv.offset_angle) * DEGREE_2_RAD);
+    sin_theta = arm_sin_f32((chassis_cmd_recv.offset_angle) * DEGREE_2_RAD);
+    
     chassis_vx = chassis_cmd_recv.vx * cos_theta - chassis_cmd_recv.vy * sin_theta; 
     chassis_vy = chassis_cmd_recv.vx * sin_theta + chassis_cmd_recv.vy * cos_theta;
 
@@ -263,7 +263,7 @@ void ChassisTask()
     chassis_cmd_recv = *(Chassis_Ctrl_Cmd_s *)CANCommGet(chasiss_can_comm);
     //底盘模式及参数设定
     ChassisStateSet();
-    ChassisStateSet();
+    ChassisRotateSet();
     // 根据控制模式进行正运动学解算,计算底盘输出
     MecanumCalculate();
     // 根据裁判系统的反馈数据和电容数据对输出限幅并设定闭环参考值

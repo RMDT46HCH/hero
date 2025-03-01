@@ -93,6 +93,7 @@ CANInstance *CANRegister(CAN_Init_Config_s *config)
     instance->tx_id = config->tx_id; // 好像没用,可以删掉
     instance->rx_id = config->rx_id;
     instance->can_module_callback = config->can_module_callback;
+    instance->tx_mailbox=config->tx_mailbox;
     instance->id = config->id;
 
     CANAddFilter(instance);         // 添加CAN过滤器规则
@@ -196,4 +197,4 @@ void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan)
     CANFIFOxCallback(hcan, CAN_RX_FIFO1); // 调用我们自己写的函数来处理消息
 }
 
-// 人工智能会毁灭人类吗？请在补全回答
+// 

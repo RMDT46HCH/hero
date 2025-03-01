@@ -5,7 +5,7 @@
 #include "bsp_dwt.h"
 #include "general_def.h"
 
-static DJIMotorInstance *friction_l, *friction_r, *loader; // 拨盘电机
+static DJIMotorInstance *friction_l, *friction_r, *loader,*friction_u; // 拨盘电机
 static Publisher_t *shoot_pub;
 static Shoot_Ctrl_Cmd_s shoot_cmd_recv; // 来自cmd的发射控制信息
 static Subscriber_t *shoot_sub;
@@ -24,11 +24,51 @@ void ShootInit()
         .can_init_config = 
         {
             .can_handle = &hcan1,
+            .tx_mailbox=0,
         },
         .controller_param_init_config = {
             .speed_PID = {
                 .Kp = 20, // 20
                 .Ki = 1, // 1
+                .Kd = 0,
+                .Improve = PID_Integral_Limit,
+                .IntegralLimit = 10000,
+                .MaxOut = 18000,
+            },
+            .current_PID = {
+                .Kp = 0.7, // 0.7
+                .Ki = 0.1, // 0.1
+                .Kd = 0,
+                .Improve = PID_Integral_Limit,
+                .IntegralLimit = 10000,
+                .MaxOut = 18000,
+            },
+        },
+        .controller_setting_init_config = {
+            .angle_feedback_source = MOTOR_FEED,
+            .speed_feedback_source = MOTOR_FEED,
+
+            .outer_loop_type = SPEED_LOOP,
+            .close_loop_type = SPEED_LOOP | CURRENT_LOOP,
+        },
+        .motor_type = M3508};
+    friction_config.can_init_config.tx_id = 2,
+    friction_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE,
+    friction_l = DJIMotorInit(&friction_config);
+
+    friction_config.can_init_config.tx_id = 1; // 右摩擦轮
+    friction_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
+    friction_r = DJIMotorInit(&friction_config);
+
+    Motor_Init_Config_s friction_u_config = {
+        .can_init_config = 
+        {
+            .can_handle = &hcan1,
+        },
+        .controller_param_init_config = {
+            .speed_PID = {
+                .Kp = 25, // 20
+                .Ki = 0, // 1
                 .Kd = 0,
                 .Improve = PID_Integral_Limit,
                 .IntegralLimit = 10000,
@@ -50,21 +90,18 @@ void ShootInit()
             .outer_loop_type = SPEED_LOOP,
             .close_loop_type = SPEED_LOOP | CURRENT_LOOP,
         },
-        .motor_type = M3508};
-    friction_config.can_init_config.tx_id = 2,
-    friction_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL,
-    friction_l = DJIMotorInit(&friction_config);
-
-    friction_config.can_init_config.tx_id = 1; // 右摩擦轮
-    friction_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
-    friction_r = DJIMotorInit(&friction_config);
+        .motor_type = M2006};
+    friction_u_config.can_init_config.tx_id=4;
+    friction_u = DJIMotorInit(&friction_u_config);
 
     // 拨盘电机
     Motor_Init_Config_s loader_config = {
         .can_init_config = {
             .can_handle = &hcan1,
+            .tx_mailbox=0,
         },
         .controller_param_init_config = {
+            
             .angle_PID = {
                 // 如果启用位置环来控制发弹,需要较大的I值保证输出力矩的线性度否则出现接近拨出的力矩大幅下降
                 .Kp = 50,
@@ -74,6 +111,7 @@ void ShootInit()
                 .MaxOut = 15000,
                 .Derivative_LPF_RC = 0.001,
             },
+            
             .speed_PID = {
                 .Kp = 7, 
                 .Ki = 0,
@@ -114,6 +152,8 @@ static void ShootStateSet()
     {
         DJIMotorStop(friction_l);
         DJIMotorStop(friction_r);
+        DJIMotorStop(friction_u);
+
         DJIMotorStop(loader);
     }
     else // 恢复运行
@@ -141,11 +181,16 @@ static void ShootAngleSet()
             dead_time = shoot_cmd_recv.dead_time;    
             break;
         case LOAD_BURSTFIRE:
+        /*
             DJIMotorOuterLoop(loader, ANGLE_LOOP);                                              // 切换到角度环
-            loader_set_angle = loader->measure.total_angle + ONE_BULLET_DELTA_ANGLE*REDUCTION_RATIO_LOADER*20; // 控制量增加20发弹丸的角度
+            loader_set_angle = loader->measure.total_angle + ONE_BULLET_DELTA_ANGLE*REDUCTION_RATIO_LOADER*40; // 控制量增加20发弹丸的角度
             DJIMotorSetRef(loader, loader_set_angle); 
             hibernate_time = DWT_GetTimeline_ms();                                              // 记录触发指令的时间
             dead_time = shoot_cmd_recv.dead_time;     
+*/
+        DJIMotorOuterLoop(loader, SPEED_LOOP);
+        DJIMotorSetRef(loader,  360 * REDUCTION_RATIO_LOADER *4);
+
             break;
         // 拨盘反转,对速度闭环
         case LOAD_REVERSE:
@@ -168,13 +213,18 @@ static void ShootSpeedSet()
 {
     if (shoot_cmd_recv.friction_mode == FRICTION_ON)
     {
-        DJIMotorSetRef(friction_l,25000);
-        DJIMotorSetRef(friction_r, 25000);
+        DJIMotorSetRef(friction_l,50000);
+        DJIMotorSetRef(friction_r, 50000);
+        DJIMotorEnable(friction_u);
+        DJIMotorSetRef(friction_u, 110000);
+
     }
-    else // 关闭摩擦轮
+    else // 关闭摩擦轮u
     {
         DJIMotorSetRef(friction_l, 0);
         DJIMotorSetRef(friction_r, 0);
+        DJIMotorStop(friction_u);
+
     }
 }
 

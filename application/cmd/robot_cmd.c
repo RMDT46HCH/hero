@@ -140,8 +140,8 @@ static void GimbalRC()
 static void ChassisRC()
 {
     /*底盘速度控制*/
-    chassis_cmd_send.vx = 10.0f * (float)rc_data[TEMP].rc.rocker_left_y; // _水平方向
-    chassis_cmd_send.vy =-10.0f * (float)rc_data[TEMP].rc.rocker_left_x; // 竖直方向
+    chassis_cmd_send.vx = 15.0f * (float)rc_data[TEMP].rc.rocker_left_y; // _水平方向
+    chassis_cmd_send.vy = -15.0f * (float)rc_data[TEMP].rc.rocker_left_x; // 竖直方向
     /*底盘模式设定*/
     if (switch_is_up(rc_data[TEMP].rc.switch_left))
     {
@@ -155,12 +155,12 @@ static void ShootRC()
 {
     if(rc_data->rc.dial>200)
     {
-        shoot_cmd_send.load_mode=LOAD_1_BULLET;
+        shoot_cmd_send.load_mode=LOAD_BURSTFIRE;
         
     }
     else if(rc_data->rc.dial<(-200))
     {
-        shoot_cmd_send.load_mode=LOAD_BURSTFIRE;
+        shoot_cmd_send.load_mode=LOAD_REVERSE;
     }
     else
     {
@@ -250,14 +250,24 @@ static void MouseKeySet()
  */
 static void ControlDataDeal()
 {
-    BasicFunctionSet();
+
     if (switch_is_mid(rc_data[TEMP].rc.switch_right)) 
     {
+        BasicFunctionSet();
+
         RemoteControlSet();
     }
     else if (switch_is_up(rc_data[TEMP].rc.switch_right)) 
     {
         MouseKeySet();   
+    }
+    else
+    {
+        gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
+        chassis_cmd_send.chassis_mode = CHASSIS_ZERO_FORCE;
+        shoot_cmd_send.shoot_mode = SHOOT_OFF;
+        shoot_cmd_send.friction_mode = FRICTION_OFF;
+        shoot_cmd_send.load_mode = LOAD_STOP;
     }
 }
 /**
@@ -274,7 +284,7 @@ static void EmergencyHandler()
         gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
         chassis_cmd_send.chassis_mode = CHASSIS_ZERO_FORCE;
         shoot_cmd_send.shoot_mode = SHOOT_OFF;
-        shoot_cmd_send.friction_mode = FRICTION_ON;
+        shoot_cmd_send.friction_mode = FRICTION_OFF;
         shoot_cmd_send.load_mode = LOAD_STOP;
         LOGERROR("[CMD] emergency stop!");
     }
@@ -284,7 +294,7 @@ static void EmergencyHandler()
         gimbal_cmd_send.gimbal_mode=GIMBAL_ZERO_FORCE;
         chassis_cmd_send.chassis_mode = CHASSIS_ZERO_FORCE;
         robot_state = ROBOT_READY;
-        shoot_cmd_send.shoot_mode = SHOOT_ON;
+        shoot_cmd_send.shoot_mode = SHOOT_OFF;
         shoot_cmd_send.friction_mode = FRICTION_OFF;
         shoot_cmd_send.load_mode = LOAD_STOP;
         LOGINFO("[CMD] reinstate, robot ready");

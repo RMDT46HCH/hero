@@ -65,9 +65,9 @@ void GimbalInit()
         },
         .controller_param_init_config = {
             .angle_PID = {
-                .Kp = 10, // 80
-                .Ki = 0,//10
-                .Kd = 0.2,//1
+                .Kp = 10, // 
+                .Ki = 0,//
+                .Kd = 0.6,//
                 .Improve = PID_Derivative_On_Measurement,
                 .IntegralLimit = 100,
                 .MaxOut = 500,
@@ -104,11 +104,12 @@ void GimbalInit()
 
     pitch_config.can_init_config.tx_id = 3;
     pitch_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
-    lower_pitch_motor =DJIMotorInit (&pitch_config);
+    upper_pitch_motor =DJIMotorInit(&pitch_config);
 
     pitch_config.can_init_config.tx_id = 4;
     pitch_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
-    upper_pitch_motor =DJIMotorInit(&pitch_config);
+    lower_pitch_motor =DJIMotorInit(&pitch_config);
+
 
     // 电机对total_angle闭环,上电时为零,会保持静止,收到遥控器数据再动
     gimbal_pub = PubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));//云台反馈出来的信息
@@ -122,20 +123,20 @@ static void GimbalStateSet()
     // 停止
     case GIMBAL_ZERO_FORCE:
         DJIMotorStop(upper_pitch_motor);
-        DJIMotorStop(lower_pitch_motor);
         DJIMotorStop(right_yaw_motor);
         DJIMotorStop(left_yaw_motor);
+
         break;
     case GIMBAL_GYRO_MODE: 
-         DJIMotorEnable(upper_pitch_motor);
-        DJIMotorEnable(lower_pitch_motor);
-        DJIMotorEnable(left_yaw_motor);
-        DJIMotorEnable(right_yaw_motor);
 
+        DJIMotorEnable(left_yaw_motor);
+        DJIMotorEnable(upper_pitch_motor);
+        DJIMotorEnable(lower_pitch_motor);
+        DJIMotorEnable(right_yaw_motor);
         DJIMotorSetRef(right_yaw_motor, gimbal_cmd_recv.yaw); // yaw和pitch会在robot_cmd中处理好多圈和单圈
         DJIMotorSetRef(upper_pitch_motor, gimbal_cmd_recv.pitch);
-        DJIMotorSetRef(left_yaw_motor, gimbal_cmd_recv.yaw); // yaw和pitch会在robot_cmd中处理好多圈和单圈
         DJIMotorSetRef(lower_pitch_motor, gimbal_cmd_recv.pitch);
+        DJIMotorSetRef(left_yaw_motor, gimbal_cmd_recv.yaw); // yaw和pitch会在robot_cmd中处理好多圈和单圈
         break;
     default:
         break;

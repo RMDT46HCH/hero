@@ -5,7 +5,7 @@
 #include "can.h"
 
 // 最多能够支持的CAN设备数
-#define CAN_MX_REGISTER_CNT 16     // 这个数量取决于CAN总线的负载
+#define CAN_MX_REGISTER_CNT 24     // 这个数量取决于CAN总线的负载
 #define MX_CAN_FILTER_CNT (2 * 14) // 最多可以使用的CAN过滤器数量,目前远不会用到这么多
 #define DEVICE_CAN_CNT 2           // 根据板子设定,F407IG有CAN1,CAN2,因此为2;F334只有一个,则设为1
 // 如果只有1个CAN,还需要把bsp_can.c中所有的hcan2变量改为hcan1(别担心,主要是总线和FIFO的负载均衡,不影响功能)
@@ -35,6 +35,7 @@ typedef struct
     uint32_t tx_id;                             // 发送id
     uint32_t rx_id;                             // 接收id
     void (*can_module_callback)(CANInstance *); // 处理接收数据的回调函数
+    uint32_t tx_mailbox;           // CAN消息填入的邮箱号
     void *id;                                   // 拥有can实例的模块地址,用于区分不同的模块(如果有需要的话),如果不需要可以不传入
 } CAN_Init_Config_s;
 
