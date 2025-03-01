@@ -8,9 +8,10 @@
 #include "message_center.h"
 #include "general_def.h"
 #include "dji_motor.h"
+#include "referee_task.h"
+#include "referee_UI.h"
 #include "buzzer.h"
-#include "rm_referee.h"
-
+#include "can_comm.h"
 // bsp
 #include "bsp_dwt.h"
 #include "bsp_log.h"
@@ -23,17 +24,14 @@
 #include "can_comm.h"
 static CANCommInstance *cmd_can_comm; // 双板通信
 
-static  BuzzzerInstance *cmd_error_buzzer;
+static  BuzzzerInstance *rc_error_buzzer;
 static  BuzzzerInstance *aim_success_buzzer;
+static  BuzzzerInstance *motor_error_buzzer;
 
 static Chassis_Ctrl_Cmd_s chassis_cmd_send;      // 发送给底盘应用的信息,包括控制信息和UI绘制相关
 static Chassis_Upload_Data_s chassis_fetch_data; // 从底盘应用接收的反馈信息信息,底盘功率枪口热量与底盘运动状态等
 
 static RC_ctrl_t *rc_data;              // 遥控器数据,初始化时返回
-
-static Minipc_Recv_s *minipc_recv_data; //小电脑接收数据指针,初始化时返回
-static Minipc_Send_s  minipc_send_data;  // 视觉发送数据
-
 static Publisher_t *gimbal_cmd_pub;            // 云台控制消息发布者
 static Subscriber_t *gimbal_feed_sub;          // 云台反馈信息订阅者
 static Gimbal_Ctrl_Cmd_s gimbal_cmd_send;      // 传递给云台的控制信息
@@ -45,52 +43,42 @@ static Shoot_Ctrl_Cmd_s shoot_cmd_send;      // 传递给发射的控制信息
 static Shoot_Upload_Data_s shoot_fetch_data; // 从发射获取的反馈信息
 
 static Robot_Status_e robot_state; // 机器人整体工作状态
-static DataLebel_t DataLebel;
-static float cnt1,cnt2;
-#include "can_comm.h"
+static float chassis_speed_buff;   // 底盘速度增益
 
 void RobotCMDInit()
 {
-    rc_data = RemoteControlInit(&huart3);   // 遥控器通信串口
-    minipc_recv_data=minipcInit(&huart1); // 视觉通信串口
+    /*遥控器串口通信初始化*/
+    rc_data = RemoteControlInit(&huart3);
+    /*创建云台及发射机构的发布者和订阅者*/   
     gimbal_cmd_pub = PubRegister("gimbal_cmd", sizeof(Gimbal_Ctrl_Cmd_s));
     gimbal_feed_sub = SubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));
     shoot_cmd_pub = PubRegister("shoot_cmd", sizeof(Shoot_Ctrl_Cmd_s));
     shoot_feed_sub = SubRegister("shoot_feed", sizeof(Shoot_Upload_Data_s));
-
+    /*云台板和底盘板的can通信初始化*/
     CANComm_Init_Config_s comm_conf = {
         .can_config = 
         {
             .can_handle = &hcan2,
-            .tx_id = 0x200,
-            .rx_id =  0x209,
+            .tx_id = 0x301,
+            .rx_id =  0x300,
         },
         .recv_data_len = sizeof(Chassis_Upload_Data_s),
         .send_data_len = sizeof(Chassis_Ctrl_Cmd_s),
     };
     cmd_can_comm = CANCommInit(&comm_conf);
-
-    Buzzer_config_s cmd_buzzer_config={
+    /*让pitch水平*/
+    gimbal_cmd_send.pitch = 0;
+    /*警报初始化*/
+    Buzzer_config_s rc_buzzer_config={
         .alarm_level=ALARM_LEVEL_HIGH,
+        .loudness=0.3,
         .octave=OCTAVE_1,
     };
-
-    Buzzer_config_s aim_success_buzzer_config= {
-        .alarm_level=ALARM_LEVEL_ABOVE_MEDIUM,
-        .octave=OCTAVE_2,
-    };
-    cmd_error_buzzer = BuzzerRegister(&cmd_buzzer_config);
-    aim_success_buzzer= BuzzerRegister(&aim_success_buzzer_config);
-    shoot_fetch_data.over_heat_flag=0;
-    gimbal_cmd_send.pitch = 0;
-    memset(&DataLebel,0,sizeof(DataLebel));
-    shoot_cmd_send.friction_mode = FRICTION_OFF;
-
+    /*启动机器人*/
+    robot_state = ROBOT_READY; // 启动时机器人进入工作模式,后续加入所有应用初始化完成之后再进入
 }
 /**
- * @brief 根据gimbal app传回的当前电机角度计算和零位的误差
- *        单圈绝对角度的范围是0~360
- *
+ * @brief 根据云台反馈值计算差角
  */
 static void CalcOffsetAngle()
 {
@@ -114,15 +102,14 @@ static void CalcOffsetAngle()
 }
 
 /**
- * @brief 每个模式的共性都放这了，不然代码太多了
- *
+ * @brief 基本功能设定
  */
 static void BasicFunctionSet()
 {
-    //云台基本模式设定
+    /*云台基本模式设定*/
     gimbal_cmd_send.gimbal_mode = GIMBAL_GYRO_MODE;
 
-    // 云台软件限位
+    /*云台软件限位*/
     if(gimbal_cmd_send.pitch<PITCH_MIN_ANGLE)
     gimbal_cmd_send.pitch=PITCH_MIN_ANGLE;
     else if (gimbal_cmd_send.pitch>PITCH_MAX_ANGLE)
@@ -130,48 +117,16 @@ static void BasicFunctionSet()
     else
     gimbal_cmd_send.pitch=gimbal_cmd_send.pitch;
 
-    //发射基本模式设定
+    /*发射机构基本模式设定*/
     shoot_cmd_send.shoot_mode = SHOOT_ON;
     shoot_cmd_send.friction_mode = FRICTION_ON;
-    shoot_cmd_send.shoot_rate=8;
+    /*发射机构弹速、发射的间隔时间设定*/
+    shoot_cmd_send.dead_time = 600;
+    shoot_cmd_send.bullet_speed = BIG_AMU_16;
 }
+
 /**
- * @brief 判断视觉有没有发信息，但因为现在发信息发的太慢了，头一直想走，所以给视觉3s的机会
- *
- */
-static void VisionJudge()
-{
-    if(minipc_recv_data->Vision.deep!=0)//代表收到信息
-    {
-        DataLebel.vision_flag=1;
-        AlarmSetStatus(aim_success_buzzer, ALARM_ON);
-        if(abs(minipc_recv_data->Vision.yaw)>1&&aim_success_buzzer->loudness<0.5)
-        {
-            aim_success_buzzer->loudness=0.5*(1/abs(minipc_recv_data->Vision.yaw));
-        }
-        else if(abs(minipc_recv_data->Vision.yaw)<1 && abs(minipc_recv_data->Vision.pitch)<1)
-        {
-            aim_success_buzzer->loudness=0.5;
-            DataLebel.fire_flag=1;
-        }
-    }
-    else if(minipc_recv_data->Vision.deep==0 && DataLebel.vision_flag==1)       
-    {
-        DataLebel.fire_flag=0;
-        DataLebel.t_shoot++;
-        if(minipc_recv_data->Vision.deep!=0)
-        DataLebel.t_shoot=0;
-        if(DataLebel.t_shoot>=100)
-        {
-            DataLebel.t_shoot=0;
-            DataLebel.vision_flag=0;
-            AlarmSetStatus(aim_success_buzzer, ALARM_OFF);
-        }
-    }
-}
-/**
- * @brief 遥控器控制
- *
+ * @brief 遥控器云台的角度控制
  */
 static void GimbalRC()
 {
@@ -179,57 +134,33 @@ static void GimbalRC()
     gimbal_cmd_send.pitch -= 0.0003f * (float)rc_data[TEMP].rc.rocker_right_y;
 }
 
+/**
+ * @brief 遥控器底盘模式及速度控制
+ */
 static void ChassisRC()
 {
-    chassis_cmd_send.vx = 10.0f * (float)rc_data[TEMP].rc.rocker_left_y; // _水平方向
-    chassis_cmd_send.vy =-10.0f * (float)rc_data[TEMP].rc.rocker_left_x; // 竖直方向
-
-    if (switch_is_down(rc_data[TEMP].rc.switch_left))
-    {
-        chassis_cmd_send.chassis_mode=CHASSIS_FOLLOW_GIMBAL_YAW;
-    }
+    /*底盘速度控制*/
+    chassis_cmd_send.vx = 15.0f * (float)rc_data[TEMP].rc.rocker_left_y; // _水平方向
+    chassis_cmd_send.vy = -15.0f * (float)rc_data[TEMP].rc.rocker_left_x; // 竖直方向
+    /*底盘模式设定*/
     if (switch_is_up(rc_data[TEMP].rc.switch_left))
+    {
         chassis_cmd_send.chassis_mode=CHASSIS_ROTATE;
+    }
+    else
+        chassis_cmd_send.chassis_mode=CHASSIS_FOLLOW_GIMBAL_YAW;
 }
 
 static void ShootRC()
 {
-
-   
     if(rc_data->rc.dial>200)
     {
-        if(shoot_fetch_data.over_heat_flag==1)
-        shoot_cmd_send.load_mode=LOAD_STOP;
-        else
-        {
-            shoot_cmd_send.load_mode=LOAD_BURSTFIRE;
-        /*
-            if(shoot_cmd_send.load_mode==LOAD_BURSTFIRE)
-            {
-                if(abs(shoot_fetch_data.speed)<100&&DWT_GetTimeline_s()>1)
-                {
-                    shoot_fetch_data.loader_error_flag++;
-                }
-            }
-
-            else if(shoot_cmd_send.load_mode==LOAD_REVERSE)
-            {
-                shoot_fetch_data.recover_flag++;
-            }
-            if(shoot_fetch_data.loader_error_flag==1&&shoot_cmd_send.load_mode==LOAD_BURSTFIRE)
-            {
-                shoot_cmd_send.load_mode=LOAD_REVERSE;
-                shoot_fetch_data.loader_error_flag=0;
-            }
-            if (shoot_fetch_data.recover_flag==1)
-            {
-                shoot_cmd_send.load_mode=LOAD_BURSTFIRE;
-                shoot_fetch_data.recover_flag=0;
-            }
-
-        }
-        */
-        }
+        shoot_cmd_send.load_mode=LOAD_BURSTFIRE;
+        
+    }
+    else if(rc_data->rc.dial<(-200))
+    {
+        shoot_cmd_send.load_mode=LOAD_REVERSE;
     }
     else
     {
@@ -240,103 +171,136 @@ static void ShootRC()
         }
     }
 }
+
 /**
- * @brief 小电脑控制
+ * @brief 遥控器模式设定
  *
  */
-static void GimbalAC()
+static void RemoteControlSet()
 {
-    VisionJudge();
-    if(DataLebel.vision_flag==0)
+    GimbalRC();
+    ChassisRC();
+    ShootRC();
+}
+
+/**
+ * @brief 输入为键鼠时模式和控制量设置
+ *
+ */
+static void MouseKeySet()
+{
+    /*底盘速度控制*/
+    chassis_cmd_send.vx = rc_data[TEMP].key[KEY_PRESS].w * 300 - rc_data[TEMP].key[KEY_PRESS].s * 300; // 系数待测
+    chassis_cmd_send.vy = rc_data[TEMP].key[KEY_PRESS].a * 300 - rc_data[TEMP].key[KEY_PRESS].d * 300;
+    /*云台角度控制*/
+    gimbal_cmd_send.yaw += (float)rc_data[TEMP].mouse.x / 660 * 10; // 系数待测
+    gimbal_cmd_send.pitch += (float)rc_data[TEMP].mouse.y / 660 * 10;
+    if(rc_data[TEMP].mouse.press_l||rc_data[TEMP].mouse.press_r)
     {
-        gimbal_cmd_send.yaw-=0.33;
-        DataLebel.t_pitch = (float32_t)DWT_GetTimeline_s();
-        gimbal_cmd_send.pitch =20*abs(sin(2.5*DataLebel.t_pitch));
-    }
-    else
-    {    
-        if(abs(minipc_recv_data->Vision.pitch)<400&&abs(minipc_recv_data->Vision.yaw)<400)
+        if(rc_data[TEMP].mouse.press_l==1&&rc_data[TEMP].mouse.press_r==0)
         {
-            gimbal_cmd_send.yaw-=0.014f*minipc_recv_data->Vision.yaw;   //往右获得的yaw是减
-            gimbal_cmd_send.pitch -= 0.009f*minipc_recv_data->Vision.pitch;
+            shoot_cmd_send.load_mode = LOAD_1_BULLET;
+        }
+        if(rc_data[TEMP].mouse.press_r)
+        {
+            shoot_cmd_send.load_mode = LOAD_BURSTFIRE;
         }
     }
-}
-
-static void ChassisAC()
-{
-    chassis_cmd_send.vx=minipc_recv_data->Nav.vx*4.0f * REDUCTION_RATIO_WHEEL * 360.0f / PERIMETER_WHEEL*1000;
-    chassis_cmd_send.vy=minipc_recv_data->Nav.vy*4.0f * REDUCTION_RATIO_WHEEL * 360.0f / PERIMETER_WHEEL*1000;
-    chassis_cmd_send.chassis_mode=CHASSIS_ROTATE;
-}
-
-static void ShootAC()
-{
-    if(DataLebel.fire_flag==1)
-    {
-        if(shoot_fetch_data.over_heat_flag==1)
-        shoot_cmd_send.load_mode=LOAD_STOP;
-        else
-        shoot_cmd_send.load_mode=LOAD_BURSTFIRE;
-    }
     else
     {
-        shoot_cmd_send.load_mode=LOAD_STOP;
+        shoot_cmd_send.load_mode = LOAD_STOP;
+        if(rc_data[TEMP].key_count[KEY_PRESS][Key_Q])
+        {
+            shoot_cmd_send.load_mode=LOAD_REVERSE;
+        }
     }
-}
-/**
- * @brief 停止
- *
- */
-static void AnythingStop()
-{
-    gimbal_cmd_send.gimbal_mode=GIMBAL_ZERO_FORCE;
-    chassis_cmd_send.chassis_mode = CHASSIS_ZERO_FORCE;
-    shoot_cmd_send.shoot_mode = SHOOT_OFF;
-    shoot_cmd_send.friction_mode = FRICTION_OFF;
-    shoot_cmd_send.load_mode = LOAD_STOP;
-    AlarmSetStatus(aim_success_buzzer, ALARM_OFF);
+    switch (rc_data[TEMP].mouse.press_l) // 鼠标左键射击
+    {
+    case 1:
+        shoot_cmd_send.load_mode = LOAD_1_BULLET;
+        if(chassis_fetch_data.over_heat_flag==1)
+        {
+            shoot_cmd_send.load_mode = LOAD_STOP;
+            break;
+        }
+        break;
+    }
+
+    switch (rc_data[TEMP].mouse.press_r) // 鼠标右键（暴走模式）
+    {
+    case 1:
+        shoot_cmd_send.load_mode = LOAD_BURSTFIRE;
+        break;
+    }
+    switch (rc_data[TEMP].key[KEY_PRESS].shift) // 待添加 按shift允许超功率 消耗缓冲能量
+    {
+    case 1:
+
+        break;
+
+    default:
+
+        break;
+    }
 }
 
 /**
- * @brief 
+ * @brief 输入为键鼠时模式和控制量设置
  *
  */
-static void RemoteDataDeal()
+static void ControlDataDeal()
 {
+
     if (switch_is_mid(rc_data[TEMP].rc.switch_right)) 
     {
         BasicFunctionSet();
-        GimbalRC();
-        ChassisRC();
-        ShootRC();
-        AlarmSetStatus(aim_success_buzzer, ALARM_OFF);
+
+        RemoteControlSet();
     }
     else if (switch_is_up(rc_data[TEMP].rc.switch_right)) 
     {
-        BasicFunctionSet();
-        GimbalAC();
-        // //等巡航搞完改为ChassisAC();
-         ChassisRC();
-         ShootAC();
+        MouseKeySet();   
     }
     else
     {
-        AnythingStop();
+        gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
+        chassis_cmd_send.chassis_mode = CHASSIS_ZERO_FORCE;
+        shoot_cmd_send.shoot_mode = SHOOT_OFF;
+        shoot_cmd_send.friction_mode = FRICTION_OFF;
+        shoot_cmd_send.load_mode = LOAD_STOP;
+    }
+}
+/**
+ * @brief  紧急停止,包括重要模块离线/双板通信失效等
+ *
+ * @todo   后续修改为遥控器离线则电机停止(关闭遥控器急停),通过给遥控器模块添加daemon实现
+ *
+ */
+static void EmergencyHandler()
+{
+    if (robot_state == ROBOT_STOP) 
+    {
+        robot_state = ROBOT_STOP;
+        gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
+        chassis_cmd_send.chassis_mode = CHASSIS_ZERO_FORCE;
+        shoot_cmd_send.shoot_mode = SHOOT_OFF;
+        shoot_cmd_send.friction_mode = FRICTION_OFF;
+        shoot_cmd_send.load_mode = LOAD_STOP;
+        LOGERROR("[CMD] emergency stop!");
+    }
+    // 遥控器右侧开关为[下]
+    if (switch_is_down(rc_data[TEMP].rc.switch_right))
+    {
+        gimbal_cmd_send.gimbal_mode=GIMBAL_ZERO_FORCE;
+        chassis_cmd_send.chassis_mode = CHASSIS_ZERO_FORCE;
+        robot_state = ROBOT_READY;
+        shoot_cmd_send.shoot_mode = SHOOT_OFF;
+        shoot_cmd_send.friction_mode = FRICTION_OFF;
+        shoot_cmd_send.load_mode = LOAD_STOP;
+        LOGINFO("[CMD] reinstate, robot ready");
     }
 }
 
-/**
- * @brief  用于发送来自底盘的裁判信息给发射机构（害怕他传了些奇奇怪怪的信息给发射机构，先注释）
- */
-static void SendJudgeShootData()
-{
-    shoot_cmd_send.bullet_real_speed=chassis_fetch_data.bullet_speed;
-    shoot_cmd_send.bullet_num=chassis_fetch_data.bullet_num;
-    shoot_cmd_send.left_bullet_heat=chassis_fetch_data.left_bullet_heat;
-    shoot_cmd_send.right_bullet_heat=chassis_fetch_data.right_bullet_heat;
-
-}
 /* 机器人核心控制任务,200Hz频率运行(必须高于视觉发送频率) */
 void RobotCMDTask()
 {
@@ -345,24 +309,14 @@ void RobotCMDTask()
     SubGetMessage(shoot_feed_sub, &shoot_fetch_data);
     SubGetMessage(gimbal_feed_sub, &gimbal_fetch_data);
 
-    // 根据gimbal的反馈值计算云台和底盘正方向的夹角
+    // 根据gimbal的反馈值计算云台和底盘正方向的夹角,不需要传参,通过static私有变量完成
     CalcOffsetAngle();
-    //控制
-    RemoteDataDeal();
-    // 设置视觉发送数据
-    VisionSetFlag();
-    VisionSetAltitude(gimbal_fetch_data.gimbal_imu_data.Yaw,gimbal_fetch_data.gimbal_imu_data.Pitch,
-                        gimbal_fetch_data.gimbal_imu_data.Roll);
-    // 设置巡航发送数据       
-    NavSetMessage(chassis_fetch_data.real_vx,chassis_fetch_data.real_vy,gimbal_fetch_data.gimbal_imu_data.Yaw,chassis_fetch_data.Occupation
-                    ,chassis_fetch_data.remain_HP,chassis_fetch_data.self_infantry_HP,chassis_fetch_data.self_hero_HP
-                    ,chassis_fetch_data.enemy_color,chassis_fetch_data.enemy_infantry_HP,chassis_fetch_data.enemy_hero_HP
-                    ,chassis_fetch_data.remain_time,shoot_cmd_send.bullet_num,chassis_fetch_data.game_progress
-                    );
-    SendJudgeShootData();
-                        // 推送消息,双板通信,视觉通信
+    ControlDataDeal();
+
+    EmergencyHandler(); // 处理模块离线和遥控器急停等紧急情况
+
+    // 推送消息,双板通信,视觉通信等
     CANCommSend(cmd_can_comm, (void *)&chassis_cmd_send);
     PubPushMessage(shoot_cmd_pub, (void *)&shoot_cmd_send);
     PubPushMessage(gimbal_cmd_pub, (void *)&gimbal_cmd_send);
-    SendMinipcData();
 }
