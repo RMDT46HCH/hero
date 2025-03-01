@@ -5,6 +5,10 @@
 #include <stdint.h>
 #include "master_process.h"
 #define PROTOCOL_CMD_ID 0x5A
+#define ODOM_CMD_ID 0xA4
+#define SEND_VISION_ID 0xA5
+#define SEND_ODOM_ID 0x4A
+
 #define OFFSET_BYTE 8 // 出数据段外，其他部分所占字节数
 
 typedef struct
@@ -19,15 +23,11 @@ typedef struct
 	uint16_t frame_tail;   // 帧尾CRC校验
 } protocol_rm_struct;
 
-
-
-
-
-
 /*接收数据处理*/
 //uint16_t get_protocol_info(uint8_t *rx_buf,			 // 接收到的原始数据
 //						   uint16_t *flags_register, // 接收数据的16位寄存器地址
 //						   uint8_t *rx_data);			 // 接收的float数据存储地址
+
 
 
 #endif

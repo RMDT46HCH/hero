@@ -1,7 +1,6 @@
 /**
  * @file controller.c
  * @author wanghongxi
- * @author modified by neozng
  * @brief  PID控制器定义
  * @version beta
  * @date 2022-11-01

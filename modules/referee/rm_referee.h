@@ -29,15 +29,14 @@ typedef struct
 	ext_game_result_t GameResult;						   // 0x0002
 	ext_game_robot_HP_t GameRobotHP;					   // 0x0003
 	ext_event_data_t EventData;							   // 0x0101
-	ext_referee_warning_t Referee_warning;                 // 0x0104
-	ext_dart_info_t dart_info;                             // 0x0105
 	ext_game_robot_state_t GameRobotState;				   // 0x0201
+	ext_referee_warning_t RefereeWarning;
 	ext_power_heat_data_t PowerHeatData;				   // 0x0202
 	ext_game_robot_pos_t GameRobotPos;					   // 0x0203
 	ext_buff_musk_t BuffMusk;							   // 0x0204
 	ext_robot_hurt_t RobotHurt;							   // 0x0206
 	ext_shoot_data_t ShootData;							   // 0x0207
-	ext_projectile_allowance_t projectile_allowance;        // 0x0208
+	ext_projectile_allowance_t ProjectileAllowance;
 
 	// 自定义交互数据的接收
 	Communicate_ReceiveData_t ReceiveData;
@@ -52,7 +51,7 @@ typedef struct
 	uint32_t chassis_flag : 1;
 	uint32_t gimbal_flag : 1;
 	uint32_t shoot_flag : 1;
-	uint32_t loader_flag : 1;
+	uint32_t lid_flag : 1;
 	uint32_t friction_flag : 1;
 	uint32_t Power_flag : 1;
 } Referee_Interactive_Flag_t;
@@ -66,16 +65,13 @@ typedef struct
 	gimbal_mode_e gimbal_mode;				 // 云台模式
 	shoot_mode_e shoot_mode;				 // 发射模式设置
 	friction_mode_e friction_mode;			 // 摩擦轮关闭
-	loader_mode_e loader_mode;
 	Chassis_Power_Data_s Chassis_Power_Data; // 功率控制
-
 
 	// 上一次的模式，用于flag判断
 	chassis_mode_e chassis_last_mode;
 	gimbal_mode_e gimbal_last_mode;
 	shoot_mode_e shoot_last_mode;
 	friction_mode_e friction_last_mode;
-	loader_mode_e loader_last_mode;
 	Chassis_Power_Data_s Chassis_last_Power_Data;
 
 } Referee_Interactive_info_t;

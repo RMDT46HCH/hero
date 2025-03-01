@@ -9,7 +9,7 @@ static GPIOInstance *gpio_instance[GPIO_MX_DEVICE_NUM] = {NULL};
  * @brief EXTI中断回调函数,根据GPIO_Pin找到对应的GPIOInstance,并调用模块回调函数(如果有)
  * @note 如何判断具体是哪一个GPIO的引脚连接到这个EXTI中断线上?
  *       一个EXTI中断线只能连接一个GPIO引脚,因此可以通过GPIO_Pin来判断,PinX对应EXTIX
- *       一个Pin号只会对应一个EXTI,详情见gpio.md
+ *       一个Pin号只会对应一个EXTI
  * @param GPIO_Pin 发生中断的GPIO_Pin
  */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)

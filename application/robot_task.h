@@ -9,11 +9,10 @@
 #include "robot.h"
 #include "ins_task.h"
 #include "motor_task.h"
-#include "referee_task.h"
 #include "master_process.h"
 #include "daemon.h"
 #include "buzzer.h"
-
+#include "referee_task.h"
 #include "bsp_log.h"
 
 osThreadId insTaskHandle;
@@ -34,12 +33,11 @@ void StartUITASK(void const *argument);
  */
 void OSTaskInit()
 {
-    osThreadDef(instask, StartINSTASK, osPriorityHigh, 0, 1024);
+    osThreadDef(instask, StartINSTASK, osPriorityAboveNormal, 0, 1024);
     insTaskHandle = osThreadCreate(osThread(instask), NULL); // 由于是阻塞读取传感器,为姿态解算设置较高优先级,确保以1khz的频率执行
-
     // 后续修改为读取传感器数据准备好的中断处理,
 
-    osThreadDef(motortask, StartMOTORTASK, osPriorityNormal, 0, 1024);
+    osThreadDef(motortask, StartMOTORTASK, osPriorityNormal, 0, 256);
     motorTaskHandle = osThreadCreate(osThread(motortask), NULL);
 
     osThreadDef(daemontask, StartDAEMONTASK, osPriorityNormal, 0, 128);
@@ -67,7 +65,7 @@ __attribute__((noreturn)) void StartINSTASK(void const *argument)
         ins_dt = DWT_GetTimeline_ms() - ins_start;
         if (ins_dt > 1)
             LOGERROR("[freeRTOS] INS Task is being DELAY! dt = [%f]", &ins_dt);
-        VisionSend(); // 解算完成后发送视觉数据,但是当前的实现不太优雅,后续若添加硬件触发需要重新考虑结构的组织
+        SendMinipcData(); // 解算完成后发送视觉数据,但是当前的实现不太优雅,后续若添加硬件触发需要重新考虑结构的组织
         osDelay(1);
     }
 }
@@ -82,7 +80,7 @@ __attribute__((noreturn)) void StartMOTORTASK(void const *argument)
         motor_start = DWT_GetTimeline_ms();
         MotorControlTask();
         motor_dt = DWT_GetTimeline_ms() - motor_start;
-        if (motor_dt >1)
+        if (motor_dt > 1)
             LOGERROR("[freeRTOS] MOTOR Task is being DELAY! dt = [%f]", &motor_dt);
         osDelay(1);
     }
@@ -136,4 +134,3 @@ __attribute__((noreturn)) void StartUITASK(void const *argument)
         osDelay(1); // 即使没有任何UI需要刷新,也挂起一次,防止卡在UITask中无法切换
     }
 }
-

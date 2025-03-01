@@ -2,7 +2,6 @@
  ******************************************************************************
  * @file	 user_lib.c
  * @author  Wang Hongxi
- * @author  modified by neozng
  * @version 0.2 beta
  * @date    2021/2/18
  * @brief

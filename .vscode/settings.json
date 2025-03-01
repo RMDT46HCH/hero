@@ -36,7 +36,8 @@
         "message_center.h": "c",
         "chassis.h": "c",
         "shoot.h": "c",
-        "crc8.h": "c"
+        "crc8.h": "c",
+        "rm_referee.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled",
     "cortex-debug.armToolchainPath": "C:\\USERS\\ADMINISTRATOR\\GCC-ARM-NONE-EABI-10.3-2021.10-WIN32\\ARM-GNU-TOOLCHIAN\\BIN",

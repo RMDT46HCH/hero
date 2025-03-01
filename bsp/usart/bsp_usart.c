@@ -2,7 +2,7 @@
 #include "bsp_log.h"
 #include "stdlib.h"
 #include "memory.h"
-
+#include "cmsis_os.h"
 /* usart service instance, modules' info would be recoreded here using USARTRegister() */
 /* usart服务实例,所有注册了usart的模块信息会被保存在这里 */
 static uint8_t idx;

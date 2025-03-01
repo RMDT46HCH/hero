@@ -1,3 +1,12 @@
+/**
+ * @file referee_protocol.h
+ * @author kidneygood (you@domain.com)
+ * @version 0.1
+ * @date 2022-12-02
+ *
+ * @copyright Copyright (c) HNU YueLu EC 2022 all rights reserved
+ *
+ */
 
 #ifndef referee_protocol_H
 #define referee_protocol_H
@@ -29,6 +38,7 @@ typedef enum
 	LEN_HEADER = 5, // 帧头长
 	LEN_CMDID = 2,	// 命令码长度
 	LEN_TAIL = 2,	// 帧尾CRC16
+
 	LEN_CRC8 = 4, // 帧头CRC8校验长度=帧头+数据长+包序号
 } JudgeFrameLength_e;
 
@@ -63,34 +73,32 @@ typedef enum
 	ID_game_result = 0x0002,			   // 比赛结果数据
 	ID_game_robot_survivors = 0x0003,	   // 比赛机器人血量数据
 	ID_event_data = 0x0101,				   // 场地事件数据
-	ID_referee_warning = 0x0104,  			// 裁判警告数据
-	ID_dart_info = 0x0105, // 飞镖发射相关数据
+	ID_referee_warning=0x104,
 	ID_game_robot_state = 0x0201,		   // 机器人状态数据
 	ID_power_heat_data = 0x0202,		   // 实时功率热量数据
 	ID_game_robot_pos = 0x0203,			   // 机器人位置数据
 	ID_buff_musk = 0x0204,				   // 机器人增益数据
 	ID_robot_hurt = 0x0206,				   // 伤害状态数据
 	ID_shoot_data = 0x0207,				   // 实时射击数据
-	ID_projectile_allowance=0x208,
+	ID_projectile_allowance=0x0208,
 	ID_student_interactive = 0x0301,	   // 机器人间交互数据
 } CmdID_e;
 
 /* 命令码数据段长,根据官方协议来定义长度，还有自定义数据长度 */
 typedef enum
 {
-	LEN_game_state = 3,							 // 0x0001
+	LEN_game_state = 11,						 // 0x0001
 	LEN_game_result = 1,						 // 0x0002
-	LEN_game_robot_HP = 2,						 // 0x0003
+	LEN_game_robot_HP = 32,						 // 0x0003
 	LEN_event_data = 4,							 // 0x0101
-	LEN_referee_warning = 4,					 // 0x0104
-	LEN_dart_info=3,							 // 0x0105
-	LEN_game_robot_state = 27,					 // 0x0201
-	LEN_power_heat_data = 14,					 // 0x0202
-	LEN_game_robot_pos = 16,					 // 0x0203
-	LEN_buff_musk = 1,							 // 0x0204
+	LEN_referee_warning=3,						 // 0x0104
+	LEN_game_robot_state = 13,					 // 0x0201
+	LEN_power_heat_data = 16,					 // 0x0202
+	LEN_game_robot_pos = 12,					 // 0x0203
+	LEN_buff_musk = 7,							 // 0x0204
 	LEN_robot_hurt = 1,							 // 0x0206
 	LEN_shoot_data = 7,							 // 0x0207
-	LEN_projectile_allowance=6,					 // 0x0208												
+	LEN_projectile_allowance=6,
 	LEN_receive_data = 6 + Communicate_Data_LEN, // 0x0301
 
 } JudgeDataLength_e;
@@ -98,30 +106,13 @@ typedef enum
 /****************************接收数据的详细说明****************************/
 /****************************接收数据的详细说明****************************/
 
-/* ID: 0x0001  Byte:  3    比赛状态数据 */
-typedef struct
-{
-	/*
-	• 1：RoboMaster 机甲大师超级对抗赛 
-	• 2：RoboMaster 机甲大师高校单项赛 
-	• 3：ICRA RoboMaster高校人工智能挑战赛 
-	• 4：RoboMaster机甲大师高校联盟赛3V3对抗  
-	• 5：RoboMaster 机甲大师高校联盟赛步兵对抗 
-	*/
-	uint8_t game_type : 4;
-	/*
-	• 0：未开始比赛 
-	• 1：准备阶段 
-	• 2：十五秒裁判系统自检阶段 
-	• 3：五秒倒计时 
-	• 4：比赛中 
-	• 5：比赛结算中 
-	*/
-	uint8_t game_progress : 4;
-	//当前阶段剩余时间
-	uint16_t stage_remain_time;
-	// UNIX时间，当机器人正确连接到裁判系统的NTP服务器后生效
-	uint64_t SyncTimeStamp; 
+/* ID: 0x0001  Byte:  11    比赛状态数据 */
+typedef  struct 
+{ 
+ uint8_t game_type : 4; 
+ uint8_t game_progress : 4; 
+ uint16_t stage_remain_time; 
+ uint64_t SyncTimeStamp; 
 } ext_game_state_t;
 
 /* ID: 0x0002  Byte:  1    比赛结果数据 */
@@ -133,88 +124,59 @@ typedef struct
 /* ID: 0x0003  Byte:  32    比赛机器人血量数据 */
 typedef struct
 {
-	uint16_t red_1_robot_HP;//红1英雄机器人血量。若该机器人未上场或者被罚下，则血量为0
-	uint16_t red_2_robot_HP;//红2工程机器人血量 
-	uint16_t red_3_robot_HP;//红3步兵机器人血量
-	uint16_t red_4_robot_HP;//红4步兵机器人血量 
-	uint16_t red_7_robot_HP; //红7哨兵机器人血量 
-	uint16_t red_outpost_HP; 
-	uint16_t red_base_HP; 
-
-	uint16_t blue_1_robot_HP; 
-	uint16_t blue_2_robot_HP; 
-	uint16_t blue_3_robot_HP; 
-	uint16_t blue_4_robot_HP; 
-	uint16_t blue_7_robot_HP; 
-	uint16_t blue_outpost_HP; 
-	uint16_t blue_base_HP; 
+	uint16_t red_1_robot_HP;
+	uint16_t red_2_robot_HP;
+	uint16_t red_3_robot_HP;
+	uint16_t red_4_robot_HP;
+	uint16_t red_5_robot_HP;
+	uint16_t red_7_robot_HP;
+	uint16_t red_outpost_HP;
+	uint16_t red_base_HP;
+	uint16_t blue_1_robot_HP;
+	uint16_t blue_2_robot_HP;
+	uint16_t blue_3_robot_HP;
+	uint16_t blue_4_robot_HP;
+	uint16_t blue_5_robot_HP;
+	uint16_t blue_7_robot_HP;
+	uint16_t blue_outpost_HP;
+	uint16_t blue_base_HP;
 } ext_game_robot_HP_t;
 
 /* ID: 0x0101  Byte:  4    场地事件数据 */
 typedef struct
 {
-	/*
-	bit 0：己方与兑换区不重叠的补给区占领状态，1为已占领 
-	bit 1：己方与兑换区重叠的补给区占领状态，1为已占领 
-	bit 2：己方补给区的占领状态，1为已占领（仅 RMUL 适用）
-	*/
 	uint32_t event_type;
 } ext_event_data_t;
 
-/* ID: 0x0104  Byte:  3    裁判警告数据 */
+/* ID: 0X0104  Byte: 3    机器人状态数据 */
 typedef  struct 
 { 
-	/*
-	己方最后一次受到判罚的等级： 
-	 1：双方黄牌 
-	 2：黄牌 
-	 3：红牌 
-	 4：判负 
-	*/
-  	uint8_t level; 
-  	/*
-	 己方最后一次受到判罚的违规机器人ID。（如红1机器人ID为1，蓝
-	1机器人ID为101） 
-	 判负和双方黄牌时，该值为0 
-	*/
-  	uint8_t offending_robot_id; 
-	//己方最后一次受到判罚的违规机器人对应判罚等级的违规次数。（开局默认为0。） 
- 	 uint8_t count; 
-} ext_referee_warning_t; 
+  uint8_t level; 
+  uint8_t offending_robot_id; 
+  uint8_t count; 
+}ext_referee_warning_t; 
 
-/* ID: 0x0105  Byte:  3    飞镖发射相关数据 */
-typedef  struct 
-{ 
-  uint8_t dart_remaining_time; 
-  uint16_t dart_info; 
-}ext_dart_info_t; 
-
-/* ID: 0X0201  Byte: 27    机器人状态数据 */
+/* ID: 0X0201  Byte: 13    机器人状态数据 */
 typedef struct
 {
-	uint8_t robot_id;
-	uint8_t robot_level;
-	uint16_t remain_HP;
-	uint16_t max_HP;
-	uint16_t shooter_id1_17mm_cooling_rate;
-	uint16_t shooter_id1_17mm_cooling_limit;
-	uint16_t shooter_id1_17mm_speed_limit;
-	uint16_t shooter_id2_17mm_cooling_rate;
-	uint16_t shooter_id2_17mm_cooling_limit;
-	uint16_t shooter_id2_17mm_speed_limit;
-	uint16_t shooter_id1_42mm_cooling_rate;
-	uint16_t shooter_id1_42mm_cooling_limit;
-	uint16_t shooter_id1_42mm_speed_limit;
-	uint16_t chassis_power_limit;
-	uint8_t mains_power_gimbal_output : 1;
-	uint8_t mains_power_chassis_output : 1;
-	uint8_t mains_power_shooter_output : 1;
+	uint8_t robot_id; 
+	uint8_t robot_level; 
+	uint16_t current_HP; 
+	uint16_t maximum_HP; 
+	uint16_t shooter_barrel_cooling_value; 
+	uint16_t shooter_barrel_heat_limit; 
+	uint16_t chassis_power_limit; 
+	uint8_t power_management_gimbal_output : 1; 
+	uint8_t power_management_chassis_output : 1; 
+	uint8_t power_management_shooter_output : 1; 
 } ext_game_robot_state_t;
 
-/* ID: 0X0202  Byte: 14    实时功率热量数据 */
+/* ID: 0X0202  Byte: 16    实时功率热量数据 */
 typedef struct
 {
-
+	uint16_t chassis_voltage; 
+	uint16_t chassis_current; 
+	float chassis_power; 
 	uint16_t buffer_energy; 
 	uint16_t shooter_17mm_1_barrel_heat; 
 	uint16_t shooter_17mm_2_barrel_heat; 
@@ -226,20 +188,22 @@ typedef struct
 {
 	float x;
 	float y;
-	float z;
 	float yaw;
 } ext_game_robot_pos_t;
 
-/* ID: 0x0204  Byte:  1    机器人增益数据 */
+/* ID: 0x0204  Byte:  7    机器人增益数据 */
 typedef struct
 {
-  uint8_t recovery_buff;  
-  uint8_t cooling_buff;  
-  uint8_t defence_buff;  
-  uint8_t vulnerability_buff; 
-  uint16_t attack_buff; 
-  uint8_t remaining_energy; 
+	uint8_t recovery_buff; 
+	uint8_t cooling_buff; 
+	uint8_t defence_buff; 
+	uint8_t vulnerability_buff; 
+	uint16_t attack_buff;
+	uint8_t remaining_energy; 
+ 
 } ext_buff_musk_t;
+
+
 
 /* ID: 0x0206  Byte:  1    伤害状态数据 */
 typedef struct
@@ -256,7 +220,6 @@ typedef struct
 	uint8_t bullet_freq;
 	float bullet_speed;
 } ext_shoot_data_t;
-/* ID: 0x0208  Byte:  7    允许发弹量数据 */
 
 typedef  struct 
 { 
@@ -423,4 +386,7 @@ typedef enum
 	UI_Color_White = 8,
 
 } UI_Graph_Color_e;
+
+#pragma pack()
+
 #endif

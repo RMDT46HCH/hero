@@ -3,9 +3,9 @@
 
 #include "bsp_usart.h"
 #include "seasky_protocol.h"
-
-#define VISION_RECV_SIZE 18u // 当前为固定值,36字节
-#define VISION_SEND_SIZE 36u
+#include "arm_math.h"
+#define MINIPC_RECV_SIZE 18u // 当前为固定值,36字节
+#define MINIPC_SEND_SIZE 36u
 
 #pragma pack(1)
 typedef enum
@@ -35,26 +35,27 @@ typedef enum
 	BASE = 8
 } Target_Type_e;
 
-//typedef struct
-//{
-	//Fire_Mode_e fire_mode;
-	//Target_State_e target_state;
-	//Target_Type_e target_type;
-//	uint8_t header;
-//	float yaw;
-//	float pitch;
-//	float deep;
-//	uint16_t checksum;
-//} Vision_Recv_s;
+
 
 typedef struct
 {
-    uint8_t header;  // 帧头，固定为0x5A
-    float yaw;       // 需要云台转动的相对 yaw 角
-    float pitch;     // 需要云台转动的相对 pitch 角
-    float deep;     // 物体距离
-    uint16_t checksum; // 校验和
-} __attribute__((packed)) Vision_Recv_s;
+	struct
+    {
+		uint8_t header;  // 帧头，固定为0x5A
+		float32_t yaw;       // 需要云台转动的相对 yaw 角
+		float32_t pitch;     // 需要云台转动的相对 pitch 角
+		float32_t deep;     // 物体距离
+		uint16_t checksum; // 校验和
+	}Vision;
+	struct
+	{
+		uint8_t header;  // 帧头，固定为0x5A
+		float32_t vx;       // 
+		float32_t vy;     // 
+		float32_t wz;      // 
+		uint16_t checksum; // 校验和
+	}Nav;
+} __attribute__((packed)) Minipc_Recv_s;
 
 typedef enum
 {
@@ -69,25 +70,38 @@ typedef enum
 	VISION_MODE_BIG_BUFF = 2,
 } Vision_Work_Mode_e;
 
-typedef enum
-{
-	BULLET_SPEED_NONE = 0,
-	BIG_AMU_10 = 10,
-	SMALL_AMU_15 = 15,
-	BIG_AMU_16 = 16,
-	SMALL_AMU_18 = 18,
-	SMALL_AMU_30 = 30,
-} Bullet_Speed_e;
+
 
 typedef struct
 {
-    uint8_t header;  // 帧头，固定为0x5A
-	uint8_t detect_color;
-	float roll;
-	float pitch;
-	float yaw;
-    uint16_t checksum; // 校验和
-} __attribute__((packed)) Vision_Send_s;
+	struct
+	{
+		uint8_t header;  // 帧头，固定为0x5A
+		uint8_t detect_color;
+		float roll;
+		float pitch;
+		float yaw;
+		uint16_t checksum; // 校验和
+	}Vision;
+	struct
+	{
+		uint8_t header;  
+		float32_t vx;
+		float32_t vy;
+		float32_t yaw;
+		uint16_t self_sentry_HP; 
+		uint16_t self_hero_HP; 
+		uint16_t self_infantry_HP; 
+		uint16_t enemy_sentry_HP;
+		uint16_t enemy_hero_HP; 
+		uint16_t enemy_infantry_HP; 
+		uint16_t remain_time;
+		uint16_t remain_bullet;
+		uint8_t occupation;
+		uint8_t game_progress;
+		uint8_t tail1; 
+	}Nav;
+} __attribute__((packed)) Minipc_Send_s;
 
 
 
@@ -102,13 +116,13 @@ typedef struct
  *
  * @param handle 用于和视觉通信的串口handle(C板上一般为USART1,丝印为USART2,4pin)
  */
-Vision_Recv_s *VisionInit(UART_HandleTypeDef *_handle);
+Minipc_Recv_s *minipcInit(UART_HandleTypeDef *_handle);
 
 /**
- * @brief 发送视觉数据
+ * @brief 发送小电脑数据
  *
  */
-void VisionSend();
+void SendMinipcData();
 
 /**
  * @brief 设置视觉发送标志位
@@ -127,15 +141,36 @@ void VisionSetFlag();
  */
 void VisionSetAltitude(float yaw, float pitch, float roll);
 
-uint16_t get_protocol_info_vision(uint8_t *rx_buf, 
-                           uint16_t *flags_register, 
-                           Vision_Recv_s *recv_data);
+/**
+ * @brief 设置巡航的信息
+ *
+ * @param vx
+ * @param vy
+ */
+void NavSetMessage(float vx, float vy, float yaw,uint8_t occupation,
+					uint16_t self_sentry_HP,uint16_t self_infantry_HP,uint16_t self_hero_HP,
+					uint16_t enermy_sentry_HP,uint16_t enermy_infantry_HP,uint16_t enermy_hero_HP,
+                    uint16_t remain_time,uint16_t remain_bullet,uint8_t game_progress
+					);
 
 /*更新发送数据帧，并计算发送数据帧长度*/
-void get_protocol_send_Vision_data(uint16_t send_id,        // 信号id
-                            uint16_t flags_register, // 16位寄存器
-                            Vision_Send_s *tx_data,          // 待发送的float数据
-                            uint8_t float_length,    // float的数据长度
+void get_protocol_send_Vision_data(
+                            Minipc_Send_s *tx_data,          // 待发送的float数据
                             uint8_t *tx_buf,         // 待发送的数据帧
                             uint16_t *tx_buf_len) ;   // 待发送的数据帧长度
+
+/*更新发送数据帧，并计算发送数据帧长度*/
+void get_protocol_send_Nav_data(
+                            Minipc_Send_s *tx_data,          // 待发送的float数据
+                            uint8_t *tx_buf,         // 待发送的数据帧
+                            uint16_t *tx_buf_len);    // 待发送的数据帧长度
+
+void get_protocol_info_vision(uint8_t *rx_buf, 
+                           Minipc_Recv_s *recv_data);
+
+void get_protocol_info_odom(uint8_t *rx_buf, 
+                           Minipc_Recv_s *recv_data);
+
+
+
 #endif // !MASTER_PROCESS_H

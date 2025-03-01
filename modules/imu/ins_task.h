@@ -2,7 +2,6 @@
  ******************************************************************************
  * @file    ins_task.h
  * @author  Wang Hongxi
- * @author  annotation and modification by NeoZeng
  * @version V2.0.0
  * @date    2022/2/23
  * @brief
