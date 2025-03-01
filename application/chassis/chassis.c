@@ -9,7 +9,8 @@
 #include "bsp_dwt.h"
 #include "arm_math.h"
 #include "buzzer.h"
-
+#include "rm_referee.h"
+#include "referee_task.h"
 /* 根据robot_def.h中的macro自动计算的参数 */
 #define HALF_WHEEL_BASE (WHEEL_BASE / 2.0f)     // 半轴距
 #define HALF_TRACK_WIDTH (TRACK_WIDTH / 2.0f)   // 半轮距
@@ -41,6 +42,8 @@ static attitude_t *chassis_IMU_data;     // 云台IMU数据
 static referee_info_t* referee_data; // 用于获取裁判系统的数据
 static SuperCapInstance *cap;
 static float  rotate_speed_buff;
+static Referee_Interactive_info_t ui_data; // UI数据，将底盘中的数据传入此结构体的对应变量中，UI会自动检测是否变化，对应显示UI
+
 #define LF_CENTER ((HALF_TRACK_WIDTH + CENTER_GIMBAL_OFFSET_X + HALF_WHEEL_BASE - CENTER_GIMBAL_OFFSET_Y) * DEGREE_2_RAD)
 #define RF_CENTER ((HALF_TRACK_WIDTH - CENTER_GIMBAL_OFFSET_X + HALF_WHEEL_BASE - CENTER_GIMBAL_OFFSET_Y) * DEGREE_2_RAD)
 #define LB_CENTER ((HALF_TRACK_WIDTH + CENTER_GIMBAL_OFFSET_X + HALF_WHEEL_BASE + CENTER_GIMBAL_OFFSET_Y) * DEGREE_2_RAD)
@@ -110,7 +113,7 @@ void ChassisInit()
     };
     chasiss_can_comm = CANCommInit(&comm_conf); // can comm初始化
 
-    //referee_data   = UITaskInit(&huart6,&ui_data); // 裁判系统初始化,会同时初始化UI
+    referee_data   = UITaskInit(&huart6,&ui_data); // 裁判系统初始化,会同时初始化UI
 
 }
 
