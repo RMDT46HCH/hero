@@ -4,7 +4,6 @@
 // module
 #include "remote_control.h"
 #include "ins_task.h"
-#include "master_process.h"
 #include "message_center.h"
 #include "general_def.h"
 #include "dji_motor.h"
@@ -122,7 +121,6 @@ static void BasicFunctionSet()
     shoot_cmd_send.friction_mode = FRICTION_ON;
     /*发射机构弹速、发射的间隔时间设定*/
     shoot_cmd_send.dead_time = 600;
-    shoot_cmd_send.bullet_speed = BIG_AMU_16;
 }
 
 /**
