@@ -3,7 +3,6 @@
 #define ROBOT_DEF_H
 
 #include "ins_task.h"
-#include "master_process.h"
 #include "stdint.h"
 #include "referee_protocol.h"
 /* 开发板类型定义,烧录时注意不要弄错对应功能;修改定义后需要重新编译,只能存在一个定义! */
@@ -155,7 +154,6 @@ typedef struct
     lid_mode_e lid_mode;
     friction_mode_e friction_mode;
 
-    Bullet_Speed_e bullet_speed; // 弹速枚举
     float bullet_real_speed; 
     uint8_t heat;
     uint8_t rest_heat;
@@ -177,15 +175,13 @@ typedef struct
 typedef struct
 {
     uint16_t remain_HP;
-    //发给视觉的数据
-    Enemy_Color_e enemy_color;   // 0 for blue, 1 for red
-    Vision_Work_Mode_e vision_work_mode;
+
+
     //发给云台的数据
     uint8_t rest_heat;           // 剩余枪口热量
     uint8_t heat;
     uint16_t heat_limit;
     uint16_t shoot_cooling_val;
-    Bullet_Speed_e bullet_real_speed; // 弹速限制
     uint8_t over_heat_flag;
     attitude_t imu_data;
 } Chassis_Upload_Data_s;

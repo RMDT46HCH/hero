@@ -18,7 +18,6 @@
 #include "tim.h"
 #include "user_lib.h"
 #include "general_def.h"
-#include "master_process.h"
 
 static INS_t INS;
 static IMU_Param_t IMU_Param;
@@ -167,7 +166,6 @@ void INS_Task(void)
         INS.Roll = QEKF_INS.Roll;
         INS.YawTotalAngle = QEKF_INS.YawTotalAngle;
 
-        VisionSetAltitude(INS.Yaw, INS.Pitch, INS.Roll);
     }
 
     // temperature control
