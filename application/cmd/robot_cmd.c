@@ -117,8 +117,8 @@ static void BasicFunctionSet()
     gimbal_cmd_send.pitch=gimbal_cmd_send.pitch;
 
     /*发射机构基本模式设定*/
-    shoot_cmd_send.shoot_mode = SHOOT_ON;
-    shoot_cmd_send.friction_mode = FRICTION_ON;
+    shoot_cmd_send.shoot_mode = SHOOT_OFF;
+    shoot_cmd_send.friction_mode = FRICTION_OFF;
     /*发射机构弹速、发射的间隔时间设定*/
     shoot_cmd_send.dead_time = 600;
 }
@@ -207,22 +207,12 @@ static void MouseKeySet()
     else
     {
         shoot_cmd_send.load_mode = LOAD_STOP;
-        if(rc_data[TEMP].key_count[KEY_PRESS][Key_Q])
+        if(rc_data[TEMP].key_count[KEY_PRESS][Key_R])
         {
             shoot_cmd_send.load_mode=LOAD_REVERSE;
         }
     }
-    switch (rc_data[TEMP].mouse.press_l) // 鼠标左键射击
-    {
-    case 1:
-        shoot_cmd_send.load_mode = LOAD_1_BULLET;
-        if(chassis_fetch_data.over_heat_flag==1)
-        {
-            shoot_cmd_send.load_mode = LOAD_STOP;
-            break;
-        }
-        break;
-    }
+
 
     switch (rc_data[TEMP].mouse.press_r) // 鼠标右键（暴走模式）
     {

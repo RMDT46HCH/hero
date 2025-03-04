@@ -37,6 +37,7 @@ static referee_info_t* referee_data; // 用于获取裁判系统的数据
 static float  rotate_speed_buff;
 static Referee_Interactive_info_t ui_data; // UI数据，将底盘中的数据传入此结构体的对应变量中，UI会自动检测是否变化，对应显示UI
 
+static float  chassis_power_buff;
 
 void ChassisInit()
 {
@@ -46,7 +47,7 @@ void ChassisInit()
         .controller_param_init_config = {
             .speed_PID = 
             {
-                .Kp = 10, // 4.5
+                .Kp = 6, // 4.5
                 .Ki = 0,  // 0
                 .Kd = 0,  // 0
                 .IntegralLimit = 3000,
@@ -147,7 +148,7 @@ static void ChassisRotateSet()
             chassis_cmd_recv.wz =0;
         break;
         case CHASSIS_ROTATE: // 变速小陀螺
-            chassis_cmd_recv.wz =2000;
+            chassis_cmd_recv.wz =30000;
         break;
         default:
         break;
@@ -177,50 +178,49 @@ static void MecanumCalculate()
  */
 static void LimitChassisOutput()
 {
-    rotate_speed_buff = 4;
-    static float  chassis_power_buff = 1.5;
     //power_data[0]= referee_data->PowerHeatData.buffer_energy;        // 缓冲能量
-
-/*具体两个buff是多少待测试
-    switch (chassis_cmd_recv.chassis_power_robot_level)
+    
+    switch (referee_data->GameRobotState.robot_level)
     {
     case 1:
-        power_data[1]=60;  
-        rotate_speed_buff = 3.7;
-        chassis_power_buff = 1.0;
+        rotate_speed_buff = 1.0;
+        chassis_power_buff =1.5;
         break;
     case 2:
-        power_data[1]=65;
-        rotate_speed_buff = 3.7;
-        chassis_power_buff = 1.0;  
+        rotate_speed_buff = 1.0;
+        chassis_power_buff =1.5;
         break;
     case 3:
-        power_data[1]=70;  
+        rotate_speed_buff = 1.0;
+        chassis_power_buff =1.5;
         break;
     case 4:
-        power_data[1]=75;  
+        rotate_speed_buff = 1.0;
+        chassis_power_buff =1.5;
         break;
     case 5:
-        power_data[1]=80;  
+        rotate_speed_buff = 1.0;
+        chassis_power_buff =1.5;
         break;
     case 6:
-        power_data[1]=85;  
+        rotate_speed_buff = 1.0;
+        chassis_power_buff =1.5;
         break;
     case 7:
-        power_data[1]=90;  
+        rotate_speed_buff = 1.0;
+        chassis_power_buff =1.5;
         break;
     case 8:
-        power_data[1]=95;  
+        rotate_speed_buff = 1.0;
+        chassis_power_buff =1.5;
         break;
     case 9:
-        power_data[1]=100;  
+        rotate_speed_buff = 1.0;
+        chassis_power_buff =1.5;
         break;
     case 10:
-        power_data[1]=100;  
-        break;
-
-    default:
-        power_data[1]=referee_data->GameRobotState.chassis_power_limit; 
+        rotate_speed_buff = 1.0;
+        chassis_power_buff =1.5;
         break; 
     }
 
@@ -230,7 +230,6 @@ static void LimitChassisOutput()
 
     // SuperCapSend(cap, (uint8_t *)&power_data);
     // chassis_cmd_recv.super_cap.chassis_power_mx = cap->cap_msg.vol;
-    */
     DJIMotorSetRef(motor_lf, vt_lf*chassis_power_buff);
     DJIMotorSetRef(motor_rf, vt_rf*chassis_power_buff);
     DJIMotorSetRef(motor_lb, vt_lb*chassis_power_buff);
@@ -244,7 +243,6 @@ static void LimitChassisOutput()
 static void SendJudgeData()
 {
     //to 发射
-    chassis_feedback_data.rest_heat = referee_data->PowerHeatData.shooter_42mm_barrel_heat;
 }
 
 /* 机器人底盘控制核心任务 */

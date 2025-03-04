@@ -6,8 +6,8 @@
 #include "stdint.h"
 #include "referee_protocol.h"
 /* 开发板类型定义,烧录时注意不要弄错对应功能;修改定义后需要重新编译,只能存在一个定义! */
-#define CHASSIS_BOARD //底盘板
-//#define GIMBAL_BOARD  //云台板
+//#define CHASSIS_BOARD //底盘板
+#define GIMBAL_BOARD  //云台板
  #define VISION_USE_UART // 使用串口发送视觉数据
  #define ODOM_USE_UART // 使用串口发送视觉数据
 
@@ -92,11 +92,6 @@ typedef enum
     FRICTION_ON,      // 摩擦轮开启
 } friction_mode_e;
 
-typedef enum
-{
-    LID_OPEN = 0, // 弹舱盖打开
-    LID_CLOSE,    // 弹舱盖关闭
-} lid_mode_e;
 
 typedef enum
 {
@@ -127,10 +122,7 @@ typedef struct
     float wz;           // 旋转速度
     float offset_angle; // 底盘和归中位置的夹角
     chassis_mode_e chassis_mode;
-    int chassis_speed_buff;
     int error_flag;
-    int chassis_power_robot_level;
-    int shoot_power_level;
     Chassis_Power_Data_s super_cap;
     // UI部分
     //  ...
@@ -151,18 +143,9 @@ typedef struct
 {
     shoot_mode_e shoot_mode;
     loader_mode_e load_mode;
-    lid_mode_e lid_mode;
     friction_mode_e friction_mode;
 
-    float bullet_real_speed; 
-    uint8_t heat;
-    uint8_t rest_heat;
     float init_loader_angle;//初始化时角度
-    float shoot_rate; // 连续发射的射频,unit per s,发/秒
-    int shoot_heat_level;
-    float fric_rate;
-    uint16_t heat_limit;
-    uint16_t shoot_cooling_val;
     float dead_time;
 } Shoot_Ctrl_Cmd_s;
 
@@ -174,16 +157,7 @@ typedef struct
 
 typedef struct
 {
-    uint16_t remain_HP;
 
-
-    //发给云台的数据
-    uint8_t rest_heat;           // 剩余枪口热量
-    uint8_t heat;
-    uint16_t heat_limit;
-    uint16_t shoot_cooling_val;
-    uint8_t over_heat_flag;
-    attitude_t imu_data;
 } Chassis_Upload_Data_s;
 
 
